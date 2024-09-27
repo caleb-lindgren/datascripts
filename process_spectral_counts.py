@@ -6,7 +6,7 @@ import sys
 
 """
 Takes peptide and protein output files from:
-Core>Browse Data>View Peptide-Protein Mapping>View>Protein Map Information>Download w/Peptides | Download Protein List
+Core>Browse Data>View Peptide-Protein Mapping>View>Protein Map Information>Download w/Peptides | View Proteins>Download Table
 
 Remove contaminant and decoy sequences from output, and print some statistics
 
@@ -38,9 +38,15 @@ for type in ["peptides", "proteins"]:
 	elif type == "proteins":
 		prot_col = "protein_id"
 
-	for filename in sorted(glob.glob(os.path.join(in_dir, "*.tsv"))):
+	filenames = sorted(glob.glob(os.path.join(in_dir, "*.tsv")))
 
-		basename = filename.split(os.sep)[-1].split(".")[0]
+	# Get the maximum amount we'll need to pad the basenames by
+	max_basename_len = max([len(os.path.basename(filename).split(".")[0]) for filename in filenames])
+
+	for filename in filenames:
+
+		basename = os.path.basename(filename).split(".")[0]
+
 		df = (
 			pl.scan_csv(filename, separator="\t")
 			.with_columns(
@@ -54,8 +60,8 @@ for type in ["peptides", "proteins"]:
 		contam_ct = df.filter(pl.col("contaminant")).shape[0]
 		decoy_ct = df.filter(pl.col("decoy")).shape[0]
 
-		contam_msg = f"{basename: >25} contaminant {type}: {contam_ct: >4}/{df.shape[0]: <6} ({contam_ct / df.shape[0]:%})"
-		decoy_msg = f"{basename: >25} decoy {type}: {decoy_ct: >4}/{df.shape[0]: <6} ({decoy_ct / df.shape[0]:%})"
+		contam_msg = f"{basename: >{max_basename_len}} contaminant {type}: {contam_ct: >4}/{df.shape[0]: <6} ({contam_ct / df.shape[0]:%})"
+		decoy_msg = f"{basename: >{max_basename_len}} decoy {type}: {decoy_ct: >4}/{df.shape[0]: <6} ({decoy_ct / df.shape[0]:%})"
 
 		if type == "peptides":
 			msgs["contaminant_peptide"].append(contam_msg)
@@ -76,14 +82,15 @@ for type in ["peptides", "proteins"]:
 		# Print number of unique and total peptides or proteins
 		if type == "peptides":
 			uniq = df.select(pl.col("peptide_sequence").unique())
-			msgs["peptide_count"].append(f"{basename: >25} peptides: {uniq.shape[0]: >8} unique, {df.shape[0]: >8} total")
+			msgs["peptide_count"].append(f"{basename: >{max_basename_len}} peptides: {uniq.shape[0]: >6} unique, {df.shape[0]: >6} total")
+
 		elif type == "proteins":
 			uniq = df.select(pl.col("protein_id").unique())
 
 			if uniq.shape[0] != df.shape[0]:
 				print(f"WARNING: different number of unique ({uniq.shape[0]}) and total ({df.shape[0]}) proteins for {filename}")
 
-			msgs["protein_count"].append(f"{basename: >25} proteins: {df.shape[0]: >8}")
+			msgs["protein_count"].append(f"{basename: >{max_basename_len}} proteins: {df.shape[0]: >6}")
 
 		df.write_csv(os.path.join(out_dir, f"{basename}.tsv"), separator="\t")
 
