@@ -1,4 +1,3 @@
-import altair as alt
 import glob
 import os
 import polars as pl
