@@ -34,8 +34,10 @@ for type in ["peptides", "proteins"]:
 
 	if type == "peptides":
 		prot_col = "ProteinID"
+		id_col = "PeptideID"
 	elif type == "proteins":
 		prot_col = "protein_id"
+		id_col = "id"
 
 	filenames = sorted(glob.glob(os.path.join(in_dir, "*.tsv")))
 
@@ -50,17 +52,18 @@ for type in ["peptides", "proteins"]:
 			pl.scan_csv(filename, separator="\t")
 			.with_columns(
 				contaminant=pl.col(prot_col).str.ends_with("_contaminant"),
-				decoy=pl.col(prot_col).str.starts_with("#")
+				decoy=pl.col(prot_col).str.starts_with("#"),
 			)
 			.collect()
 		)
 
 		# Print amounts of contaminants and decoys
-		contam_ct = df.filter(pl.col("contaminant")).shape[0]
-		decoy_ct = df.filter(pl.col("decoy")).shape[0]
+		contam_ct = df.filter(pl.col("contaminant")).get_column(id_col).unique().shape[0]
+		decoy_ct = df.filter(pl.col("decoy")).get_column(id_col).unique().shape[0]
 
-		contam_msg = f"{basename: >{max_basename_len}} contaminant {type}: {contam_ct: >4}/{df.shape[0]: <6} ({contam_ct / df.shape[0]:%})"
-		decoy_msg = f"{basename: >{max_basename_len}} decoy {type}: {decoy_ct: >4}/{df.shape[0]: <6} ({decoy_ct / df.shape[0]:%})"
+
+		contam_msg = f"{basename: >{max_basename_len}} contaminant {type}: {contam_ct: >4}/{df.get_column(id_col).unique().shape[0]: <6} ({contam_ct / df.get_column(id_col).unique().shape[0]:%})"
+		decoy_msg = f"{basename: >{max_basename_len}} decoy {type}: {decoy_ct: >4}/{df.get_column(id_col).unique().shape[0]: <6} ({decoy_ct / df.get_column(id_col).unique().shape[0]:%})"
 
 		if type == "peptides":
 			msgs["contaminant_peptide"].append(contam_msg)
@@ -81,15 +84,15 @@ for type in ["peptides", "proteins"]:
 		# Print number of unique and total peptides or proteins
 		if type == "peptides":
 			uniq = df.select(pl.col("peptide_sequence").unique())
-			msgs["peptide_count"].append(f"{basename: >{max_basename_len}} peptides: {uniq.shape[0]: >6} unique, {df.shape[0]: >6} total")
+			msgs["peptide_count"].append(f"{basename: >{max_basename_len}} peptides: {uniq.shape[0]: >6} unique, {df.get_column(id_col).unique().shape[0]: >6} total")
 
 		elif type == "proteins":
 			uniq = df.select(pl.col("protein_id").unique())
 
-			if uniq.shape[0] != df.shape[0]:
-				print(f"WARNING: different number of unique ({uniq.shape[0]}) and total ({df.shape[0]}) proteins for {filename}")
+			if uniq.shape[0] != df.get_column(id_col).unique().shape[0]:
+				print(f"WARNING: different number of unique ({uniq.shape[0]}) and total ({df.get_column(id_col).unique().shape[0]}) proteins for {filename}")
 
-			msgs["protein_count"].append(f"{basename: >{max_basename_len}} proteins: {df.shape[0]: >6}")
+			msgs["protein_count"].append(f"{basename: >{max_basename_len}} proteins: {df.get_column(id_col).unique().shape[0]: >6}")
 
 		df.write_csv(os.path.join(out_dir, f"{basename}.tsv"), separator="\t")
 
