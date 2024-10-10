@@ -133,8 +133,6 @@ for type in ["peptides", "proteins"]:
 			)
 
 		elif type == "proteins":
-			with pl.Config(tbl_rows=20, tbl_cols=-1, tbl_width_chars=1000, fmt_str_lengths=100):
-				print(df)
 
 			# Protein count
 			add_entry(
@@ -163,6 +161,21 @@ for type in ["peptides", "proteins"]:
 
 		df.write_csv(os.path.join(out_dir, f"{basename}.tsv"), separator="\t")
 
+def format_col(coltype, max_col_width):
+	return pl.concat_str(
+		[
+			pl.col("stat_name"),
+			pl.lit(f" {coltype}: "),
+			pl.col(f"{coltype}_count").map_elements(lambda ct: f"{ct: >{max_col_width},}", return_dtype=pl.String),
+			pl.lit(" / "),
+			pl.col("count").map_elements(lambda ct: f"{ct: <{max_col_width},}", return_dtype=pl.String),
+			pl.lit(" ("),
+			pl.col(f"{coltype}_prop").map_elements(lambda prop: f"{prop:.2%}", return_dtype=pl.String),
+			pl.lit(")")
+		],
+		separator="",
+	)
+
 df_all = (
 	pl.DataFrame({
 		"basename": df_basenames,
@@ -176,7 +189,38 @@ df_all = (
 	})
 	.sort("basename", "sort_order")
 	.drop("sort_order")
+	.with_columns(
+		decoy_prop=pl.col("decoy_count") / pl.col("count"),
+		contaminant_prop=pl.col("contaminant_count") / pl.col("count"),
+		real_prop=pl.col("real_count") / pl.col("count"),
+	)
 )
 
-with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_width_chars=1000, fmt_str_lengths=50):
-	print(df_all)
+max_col_width = 9
+
+df_all = (
+	df_all.with_columns(
+		decoy=format_col("decoy", max_col_width=max_col_width),
+		contaminant=format_col("contaminant", max_col_width=max_col_width),
+		real=format_col("real", max_col_width=max_col_width),
+	)
+	.select("basename", "real", "decoy", "contaminant")
+)
+
+for basename in sorted(df_all.get_column("basename").unique()):
+
+	sel = (
+		df_all.filter(pl.col("basename") == basename)
+	)
+
+	with pl.Config(
+		tbl_rows=-1,
+		tbl_cols=-1,
+		tbl_width_chars=1000,
+		fmt_str_lengths=1000,
+		tbl_cell_alignment="RIGHT",
+		tbl_hide_column_data_types=True,
+		tbl_hide_dataframe_shape=True,
+		tbl_hide_column_names=True,
+	):
+		print(sel)
