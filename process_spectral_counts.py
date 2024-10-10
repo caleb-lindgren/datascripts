@@ -87,18 +87,9 @@ for type in ["peptides", "proteins"]:
 				filter=lambda df: df.n_unique(subset=["SearchID", "PeptideID"]),
 			)
 
-			# Number of unique peptides (number of unique values in sequence column)
-			add_entry(
-				sort_order=1,
-				basename=basename,
-				type=type,
-				stat_name="unique_peptides",
-				filter=lambda df: df.n_unique(subset="peptide_sequence"),
-			)
-
 			# Total PSMs
 			add_entry(
-				sort_order=2,
+				sort_order=1,
 				basename=basename,
 				type=type,
 				stat_name="total_psms",
@@ -107,7 +98,7 @@ for type in ["peptides", "proteins"]:
 
 			# Picked PSMs
 			add_entry(
-				sort_order=3,
+				sort_order=2,
 				basename=basename,
 				type=type,
 				stat_name="picked_psms",
@@ -116,7 +107,7 @@ for type in ["peptides", "proteins"]:
 
 			# Unique PSMs
 			add_entry(
-				sort_order=4,
+				sort_order=3,
 				basename=basename,
 				type=type,
 				stat_name="unique_psms",
@@ -125,11 +116,20 @@ for type in ["peptides", "proteins"]:
 
 			# Razor PSMs
 			add_entry(
-				sort_order=5,
+				sort_order=4,
 				basename=basename,
 				type=type,
 				stat_name="razor_psms",
 				filter=lambda df: df.filter(pl.col("Peptide_parsimony") == "R").shape[0],
+			)
+
+			# Number of unique peptides (number of unique values in sequence column)
+			add_entry(
+				sort_order=5,
+				basename=basename,
+				type=type,
+				stat_name="unique_peptides",
+				filter=lambda df: df.n_unique(subset="peptide_sequence"),
 			)
 
 		elif type == "proteins":
@@ -156,6 +156,10 @@ for type in ["peptides", "proteins"]:
 			)
 			.drop("contaminant", "decoy")
 		)
+
+		# If it's the peptides file, only keep unique and Razor PSMs
+		if type == "peptides":
+			df = df.filter(pl.col("Peptide_parsimony").is_not_null())
 
 		df.write_csv(os.path.join(out_dir, f"{basename}.tsv"), separator="\t")
 
