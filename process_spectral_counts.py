@@ -64,7 +64,7 @@ for type in ["peptides", "proteins"]:
 
 	for filename in filenames:
 
-		basename = os.path.basename(filename).split(".")[0]
+		basename = os.path.basename(filename).rsplit(".", maxsplit=1)[0]
 
 		# Mark the rows that are decoys and contaminants
 		df = (
