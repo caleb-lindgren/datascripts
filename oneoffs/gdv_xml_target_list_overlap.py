@@ -22,8 +22,8 @@ targets = (
 gdvxmls = []
 for file in sys.argv[2:]:
 
-	priming_regex = re.search(r"_PR(\d)\.gdvxml$", file)
-	analytical_regex = re.search(r"_A(\d).*\.gdvxml$", file)
+	priming_regex = re.search(r"PR(\d)\.gdvxml$", file)
+	analytical_regex = re.search(r"A(\d)\.gdvxml$", file)
 
 	if priming_regex:
 		run_type = "priming"
@@ -138,11 +138,17 @@ df = (
 		how="full",
 		coalesce=True,
 	)
+	.filter(pl.all_horizontal(pl.all().is_not_null()))
 	.sort(
-		pl.col("^priming_run.*_ms2$"),
-		pl.col("^analytical_run.*_ms3$"),
+		by=["priming_run1_ms2", "analytical_run1_ms2", "analytical_run1_ms3"],
+		descending=[False, True, True],
+	)
+	.tail(300)
+	.select(
+		pl.col.gene.alias("GeneSymbol"),
+		pl.col.seq.alias("Peptide"),
+		pl.col.z,
 	)
 )
 
-with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_width_chars=10000, fmt_str_lengths=1000, fmt_table_cell_list_len=100):
-	print(df)
+df.write_csv("/mnt/clindgren/cellbio/Gygi Lab/caleb/GoDigMeta/TargetLists/20250509_CML_300gettable-from-1285primed.csv", quote_style="non_numeric")
