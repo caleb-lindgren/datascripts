@@ -65,34 +65,40 @@ df5k = (
 	df.sample(n=5000, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df5k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_5k-from-5cell15runs-in-qy4cellLib.csv")
+df5k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_5k-from-5cell15runs-in-qy4cellLib.csv")
 
 df3k = (
-	df5k.sample(n=3000, with_replacement=False, seed=0)
+	df.sample(n=3000, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df3k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_3k-from-5cell15runs-in-qy4cellLib.csv")
+df3k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_3k-from-5cell15runs-in-qy4cellLib.csv")
 
 df2500 = (
-	df3k.sample(n=2500, with_replacement=False, seed=0)
+	df.sample(n=2500, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df2500.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_2500-from-5cell15runs-in-qy4cellLib.csv")
+df2500.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_2500-from-5cell15runs-in-qy4cellLib.csv")
 
 df2k = (
-	df2500.sample(n=2000, with_replacement=False, seed=0)
+	df.sample(n=2000, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df2k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_2k-from-5cell15runs-in-qy4cellLib.csv")
+df2k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_2k-from-5cell15runs-in-qy4cellLib.csv")
 
 df1500 = (
-	df2k.sample(n=1500, with_replacement=False, seed=0)
+	df.sample(n=1500, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df1500.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_1500-from-5cell15runs-in-qy4cellLib.csv")
+df1500.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_1500-from-5cell15runs-in-qy4cellLib.csv")
+
+df1k = (
+	df.sample(n=1000, with_replacement=False, seed=0)
+	.sort("GeneSymbol", "Peptide")
+)
+df1k.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_1k-from-5cell15runs-in-qy4cellLib.csv")
 
 df300 = (
-	df1500.sample(n=300, with_replacement=False, seed=0)
+	df.sample(n=300, with_replacement=False, seed=0)
 	.sort("GeneSymbol", "Peptide")
 )
-df300.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/250710_CML_300-from-5cell15runs-in-qy4cellLib.csv")
+df300.write_csv("../../GoDigMeta/TargetLists/5cell_15runs/new/250710_CML_300-from-5cell15runs-in-qy4cellLib.csv")
