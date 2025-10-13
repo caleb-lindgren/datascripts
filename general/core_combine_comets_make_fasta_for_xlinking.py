@@ -4,9 +4,15 @@ import pyopenms as oms
 import sys
 import time
 
+"""
+Usage:
+
+python core_combine_comets_make_fasta_for_xlinking.py FULL_FASTA_PATH PROTEIN TABLE PATHS
+"""
+
 # Input is protein table(s) downloaded from protein map in Core, all will be combined
 dfs = []
-for res in sys.argv[1:-1]:
+for res in sys.argv[2:]:
 	dfs.append(pl.read_csv(res, separator="\t"))
 
 df = (
@@ -23,7 +29,7 @@ df = (
 with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_width_chars=10000, fmt_str_lengths=1000, fmt_table_cell_list_len=100):
 	print(df)
 
-full_fasta_path = sys.argv[-1]
+full_fasta_path = sys.argv[1]
 full_fasta = []
 oms.FASTAFile().load(full_fasta_path, full_fasta)
 

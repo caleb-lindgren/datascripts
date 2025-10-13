@@ -28,4 +28,4 @@ df = (
     .sort("GeneSymbol", "Peptide", "z")
 )
 
-df.write_csv("primed.csv", quote_style="non_numeric")
+df.write_csv(f"{df.shape[0]}primed.csv", quote_style="non_numeric")
