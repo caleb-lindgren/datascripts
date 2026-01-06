@@ -18,13 +18,19 @@ for res in sys.argv[2:]:
 df = (
 	pl.concat(dfs, how="vertical")
 	.select(
-		pl.col.protein_id,#.replace({"sp|P02768|ALBU_HUMAN_contaminant": "sp|P02768|ALBU_HUMAN"}),
+		#pl.col.protein_id.replace({"sp|P02768|ALBU_HUMAN_contaminant": "sp|P02768|ALBU_HUMAN"}),
+		pl.col.protein_id,
 		pl.col.assigned_peptides.alias("spectral_cts"),
 	)
 	.sort(by=["spectral_cts"], descending=True)
 	.unique(subset="protein_id", keep="first")
+
+	# Filter out any proteins that don't have at least 1% as many spectral
+	# counts as the protein with the most spectral counts
+	.filter(pl.col.spectral_cts >= pl.col.spectral_cts.max() * 0.01)
 	.sort(by=["spectral_cts", "protein_id"], descending=True)
 )
+
 
 with pl.Config(tbl_rows=-1, tbl_cols=-1, tbl_width_chars=10000, fmt_str_lengths=1000, fmt_table_cell_list_len=100):
 	print(df)
