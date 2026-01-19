@@ -10,20 +10,25 @@ import time
 
 """
 Usage:
-python search_comet.py COMET_WORKFLOW_PATH XLINK_WORKFLOW_PATH RAW_FILE_GROUP RAW FILE PATHS
+python search_comet.py COMET_WORKFLOW_PATH XLINK_WORKFLOW_PATH XLINK_FASTA_EXCLUDE ORGANISM RAW_FILE_GROUP RAW FILE PATHS
 """
 
 comet_workflow_path = sys.argv[1]
 xlink_workflow_path = sys.argv[2]
-raw_group = sys.argv[3]
-raw_paths = sys.argv[4:]
+xlink_fasta_exclude = sys.argv[3].split(",")
+organism = sys.argv[4]
+raw_group = sys.argv[5]
+raw_paths = sys.argv[6:]
 
-timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+local_fastas_dir = "fastas"
+
+datestamp = datetime.datetime.now().strftime("%Y%m%d")
 safe_filename_re = r"^[A-Za-z0-9_\-]+$"
 
 if not re.match(safe_filename_re, raw_group):
 	raise ValueError(f"RAW_FILE_GROUP must be only alphanumeric plus underscore and hyphen, no spaces")
 
+"""
 uploaded = []
 for raw_path in raw_paths:
 
@@ -36,7 +41,7 @@ for raw_path in raw_paths:
 	if not re.match(safe_filename_re, raw_filename_parts[0]):
 		raise ValueError(f"raw file '{raw_filename}': filename must be only alphanumeric plus underscore and hyphen, no spaces")
 
-	raw_savename = f"{timestamp}_{raw_group}_{os.path.basename(raw_path)}"
+	raw_savename = f"{datestamp}_{raw_group}_{os.path.basename(raw_path)}"
 
 	# Upload raw file
 	resp = coreapipy.post_raw(
@@ -102,6 +107,7 @@ df = (
 	.filter(pl.col.spectral_cts >= pl.col.spectral_cts.max() * 0.01)
 	.sort(by=["spectral_cts", "protein_id"], descending=True)
 )
+"""
 
 with open(comet_workflow_path, "r") as comet_workflow_file:
 	comet_workflow = json.load(comet_workflow_file)
@@ -111,19 +117,35 @@ comet_params = coreapipy.get_search_params(
 	type="comet",
 	path=comet_params_path_server,
 )
-fasta_path_server = re.search(r"^database_name = (.*)$", comet_params, re.MULTILINE).group(1)
 
-# TODO: download FASTA, figure out how oms wants to read it
+comet_fasta_path_server = re.search(r"^database_name = (.*)$", comet_params, re.MULTILINE).group(1)
+comet_fasta_path_local = os.path.join(
+	local_fastas_dir,
+	os.path.basename(comet_fasta_path_server),
+)
 
-full_fasta = []
-oms.FASTAFile().load(full_fasta_path, full_fasta)
+"""
+def load_fasta_maybe_download(local_path, server_path):
 
-xlink_fasta_path = f"from_comet_{time.strftime('%Y%m%d-%H%M%S')}.fasta"
+	if not os.path.isfile(local_path):
+		with open(local_path, "w") as fasta_file:
+			fasta_file.write(coreapipy.get_fasta(path=server_path))
+
+	fasta = []
+	oms.FASTAFile().load(local_path, fasta)
+
+	return fasta
+
+comet_fasta = load_fasta_maybe_download(
+	local_path=comet_fasta_path_local,
+	server_path=comet_fasta_path_server,
+)
+
 xlink_fasta = []
 
 for prot in df.get_column("protein_id"):
 	added = 0
-	for entry in full_fasta:
+	for entry in comet_fasta:
 		if entry.identifier == prot:
 			xlink_fasta.append(entry)
 			added += 1
@@ -131,10 +153,87 @@ for prot in df.get_column("protein_id"):
 	if added == 0:
 		raise ValueError(f"{prot} not found")
 
-oms.FASTAFile().store(xlink_fasta_path, xlink_fasta)
+# Get the contaminants FASTA
+contams_filename = "contaminants.fasta"
+contams_path_server = None
 
-# Upload, reverse, and register FASTA
+all_fastas = coreapipy.get_fasta_paths()
+for user in all_fastas:
+	if user["user"] == "shared":
+		for fasta in user["databases"]:
+			if fasta["name"] == contams_filename:
+				contams_path_server = fasta["path"]
+				break
+	if contams_path_server is not None:
+		break
 
-# Make new xlink params with customized FASTA
+if contams_path_server is None:
+	raise RuntimeError("Contaminants FASTA not found on server")
+
+contams_path_local = os.path.join(local_fastas_dir, contams_filename)
+
+contams_fasta = load_fasta_maybe_download(
+	local_path=contams_path_local,
+	server_path=contams_path_server,
+)
+
+# Save the xlink FASTA with contaminants, optionally filtering out some
+
+for contam in reversed(contams_fasta):
+	if contam.identifier.split("|")[1] not in xlink_fasta_exclude:
+		xlink_fasta.insert(0, contam)
+"""
+raws_names = sorted([
+	os.path.basename(raw_path).strip(".raw")
+	for raw_path in raw_paths
+])
+
+xlink_fasta_name = f"{datestamp}_xlink_{raw_group}_{raws_names[0]}-{raws_names[-1]}.fasta"
+"""
+xlink_fasta_path_local = os.path.join(local_fastas_dir, xlink_fasta_name)
+
+oms.FASTAFile().store(xlink_fasta_path_local, xlink_fasta)
+
+# Upload, reverse, and register the xlink FASTA
+
+fasta_resp = coreapipy.post_fasta(
+	name=xlink_fasta_name,
+	path=xlink_fasta_path_local,
+	reverse=True,
+	register=True,
+	organism=organism,
+	type="Uniprot",
+	notes=None,
+	search_algorithm="Comet",
+)
+"""
+
+# Make new xlink params with the xlink FASTA
+
+xlink_fasta_path_server = "/".join([
+	os.path.dirname(comet_fasta_path_server),
+	xlink_fasta_name,
+])
+
+with open(xlink_workflow_path, "r") as xlink_workflow_file:
+	xlink_workflow = json.load(xlink_workflow_file)
+
+xlink_params_path_server = xlink_workflow["items"][3]["parameters"]["search_params"]
+xlink_params = coreapipy.get_search_params(
+	type="xlink",
+	path=xlink_params_path_server,
+)
+
+xlink_params_fasta_label = "fastaFile ="
+
+xlink_params = re.sub(
+	pattern=rf"^{xlink_params_fasta_label} *$",
+	repl=f"{xlink_params_fasta_label} {xlink_fasta_path_server}",
+	string=xlink_params,
+	count=1,
+	flags=re.MULTILINE
+)
+
+print(xlink_params)
 
 # Queue xlink search and LDAs
