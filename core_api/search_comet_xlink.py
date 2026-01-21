@@ -110,7 +110,7 @@ comet_protein_map_df = (
 
 	# Filter out any proteins that don't have at least 1% as many spectral
 	# counts as the protein with the most spectral counts
-	#.filter(pl.col.spectral_cts >= pl.col.spectral_cts.max() * 0.01)
+	.filter(pl.col.spectral_cts >= pl.col.spectral_cts.max() * 0.01)
 	.sort(by=["spectral_cts", "protein_id"], descending=True)
 )
 
@@ -157,40 +157,7 @@ for prot in comet_protein_map_df.get_column("protein_id"):
 	if added == 0:
 		raise ValueError(f"{prot} not found")
 
-# Get the contaminants FASTA
-contams_filename = "contaminants.fasta"
-contams_path_server = None
-
-all_fastas = coreapipy.get_fasta_paths()
-for user in all_fastas:
-	if user["user"] == "shared":
-		for fasta in user["databases"]:
-			if fasta["name"] == contams_filename:
-				contams_path_server = fasta["path"]
-				break
-	if contams_path_server is not None:
-		break
-
-if contams_path_server is None:
-	raise RuntimeError("Contaminants FASTA not found on server")
-
-contams_path_local = os.path.join(local_fastas_dir, contams_filename)
-
-contams_fasta = load_fasta_maybe_download(
-	local_path=contams_path_local,
-	server_path=contams_path_server,
-)
-
-# Save the xlink FASTA with contaminants, filtering out any contaminants with a
-# Uniprot ID matching one of the proteins in the Comet protein map
-protein_map_uniprot_ids = (
-	comet_protein_map_df
-	.get_column("protein_id").str.split("|").list.get(1)
-)
-
-for contam in reversed(contams_fasta):
-	if contam.identifier.split("|")[1] not in protein_map_uniprot_ids:
-		xlink_fasta.insert(0, contam)
+# Save the xlink FASTA
 raws_names = sorted([
 	os.path.basename(raw_path).strip(".raw")
 	for raw_path in raw_paths
