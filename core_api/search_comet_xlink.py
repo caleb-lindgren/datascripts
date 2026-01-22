@@ -64,34 +64,63 @@ for raw_path in raw_paths:
 user_dir = coreapipy.get_raws_paths()[-1].split(coreapipy.username)[0] + coreapipy.username
 
 # Queue search
-last_jobs = []
-protein_map_ids = []
+def queue_track_search(
+	type,
+	raw_filenames,
+	user_dir,
+	get_track_job_id,
+	get_output_id,
+	workflow=None
+	workflow_path=None,
+):
 
-for raw in uploaded:
+	if workflow is None and workflow_path is None:
+		raise ValueError("Must provide either workflow or workflow path")
 
-	full_path = f"{user_dir}/{raw}"
+	last_jobs = []
+	output_ids = []
 
-	comet_resp = coreapipy.post_search(
-		raws=[full_path],
-		workflow_path=comet_workflow_path,
-	)
+	for raw in raw_file_names:
 
-	last_jobs.append(comet_resp["items"][-1]["targets"][-1]["data"]["assembler_job_id"])
-	protein_map_ids.append(comet_resp["items"][-1]["targets"][-1]["data"]["protein_map_id"])
+		full_path = f"{user_dir}/{raw}"
 
-# Wait for searches to finish--last job is protein_assembler.load_protein
-print("Searching with Comet", end="", flush=True)
-while last_jobs:
-	running = []
-	for job_id in last_jobs:
-		status = coreapipy.get_job(job_id).json()["jobs_status"]
-		if status != "done":
-			running.append(job_id)
-			print(".", end="", flush=True)
-	last_jobs = running
-	time.sleep(10)
+		if workflow is None:
+			post_search_resp = coreapipy.post_search(
+				raws=[full_path],
+				workflow_path=workflow_path,
+			)
+		else:
+			post_search_resp = coreapipy.post_search(
+				raws=[full_path],
+				workflow=workflow,
+			)
 
-print("\nComet search(es) finished")
+		last_jobs.append(get_track_job_id(post_search_resp))
+		output_ids.append(get_output_id(post_search_resp))
+
+	# Wait for searches to finish--last job is protein_assembler.load_protein
+	print(f"Searching with {type}", end="", flush=True)
+	while last_jobs:
+		running = []
+		for job_id in last_jobs:
+			status = coreapipy.get_job(job_id).json()["jobs_status"]
+			if status != "done":
+				running.append(job_id)
+				print(".", end="", flush=True)
+		last_jobs = running
+		time.sleep(10)
+
+	print("\nSearches finished")
+
+	return output_ids
+
+protein_map_ids = queue_track_search(
+	workflow_path=comet_workflow_path,
+	raw_filenames=uploaded,
+	user_dir=user_dir,
+	get_track_job_id=lambda resp: resp["items"][-1]["targets"][-1]["data"]["assembler_job_id"],
+	get_output_id=lambda resp: resp["items"][-1]["targets"][-1]["data"]["protein_map_id"],
+)
 
 # Download protein tables and create FASTA for xlink search
 comet_protein_map_dfs = []
@@ -218,18 +247,22 @@ xlink_params_path_server = xlink_params_resp["path"]
 # Queue xlink search and LDAs
 xlink_workflow["items"][3]["parameters"]["search_params"] = xlink_params_path_server
 
-for raw in uploaded:
+xlink_searched_ids = queue_track_search(
+	workflow=xlink_workflow,
+	raw_filenames=uploaded,
+	user_dir=user_dir,
+	get_track_job_id=lambda resp: resp["items"][-1]["targets"][-1]["data"]["job_id"],
+	get_output_id=lambda resp: resp["items"][-1]["targets"][-1]["data"]["search_id"],
+)
 
-	full_path = f"{user_dir}/{raw}"
+xlink_searched_ids = pl.DataFrame({
+	"search_id": xlink_searched_ids,
+})
 
-	xlink_search_resp = coreapipy.post_search(
-		raws=[full_path],
-		workflow=xlink_workflow,
-	)
-
-	import pprint
-	pprint.pprint(xlink_search_resp)
-
-	xlink_search_resp["items"][-1]["targets"][-1]["data"]["job_id"]
-	xlink_search_resp["items"][-1]["targets"][-1]["data"]["set_id"]
-	xlink_search_resp["items"][-1]["targets"][-1]["data"]["search_id"]
+xlink_searched_ids.write_csv(
+	os.path.join(
+		"core_download_params",
+		f"{datestamp}_xlink-{xlinker}_{raw_group}_{raws_names[0]}-{raws_names[-1]}.tsv",
+	),
+	separator="\t",
+)
